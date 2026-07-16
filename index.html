@@ -192,6 +192,7 @@
     let lastPinchDist = null;
     let lastPinchCenter = null;
     let isPanning = false;
+    let wasMultiTouch = false; // تشخیص اینکه آیا کاربر در حال زوم دو انگشتی است یا خیر
 
     // متغیرهای روند نشانه‌گذاری
     let drawState = 0; // 0: Idle, 1: Point1, 2: Point2
@@ -389,12 +390,22 @@
       pointers.set(e.pointerId, e);
       lastPinchDist = null;
 
+      // اگر بیشتر از یک انگشت روی صفحه بود، یعنی کاربر در حال زوم است
+      if (pointers.size > 1) {
+        wasMultiTouch = true;
+      }
+
       // روند نشانه‌گذاری فعال است
       if (drawState !== 0) {
-        const pos = getImgCoord(e.clientX, e.clientY);
-        currentMousePos = pos;
-        redraw();
-        updateMagnifier(e.clientX, e.clientY);
+        // فقط در صورتی که زوم دو انگشتی در کار نیست، ذره‌بین را نشان بده
+        if (!wasMultiTouch) {
+          const pos = getImgCoord(e.clientX, e.clientY);
+          currentMousePos = pos;
+          redraw();
+          updateMagnifier(e.clientX, e.clientY);
+        } else {
+          hideMagnifier();
+        }
       } else {
         // شروع اسکرول معمولی با کشیدن موس/انگشت
         if (pointers.size === 1) {
@@ -466,7 +477,9 @@
 
     function handlePointerUp(e) {
       if(!baseImage) return;
-      const wasDrawing = (drawState !== 0 && pointers.has(e.pointerId));
+      
+      // فقط زمانی رسم را تایید کن که درگیر زوم دو انگشتی نبوده باشیم
+      const wasDrawing = (drawState !== 0 && pointers.has(e.pointerId) && !wasMultiTouch);
 
       pointers.delete(e.pointerId);
       if(pointers.size < 2) {
@@ -474,12 +487,14 @@
         lastPinchCenter = null;
       }
       
+      // وقتی هیچ انگشتی روی صفحه نیست
       if(pointers.size === 0) {
         isPanning = false;
+        wasMultiTouch = false; // ریست کردن وضعیت زوم دو انگشتی
         workspace.style.cursor = drawState !== 0 ? 'crosshair' : 'grab';
       }
       
-      // زمانی که کلیک برداشته شد یا انگشت برداشته شد نقطه ثبت می‌شود
+      // ثبت نقطه فقط در صورتی انجام می‌شود که کاربر زوم نکرده باشد
       if (wasDrawing) {
         hideMagnifier();
         registerPoint(getImgCoord(e.clientX, e.clientY));
